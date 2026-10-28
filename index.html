@@ -42,6 +42,10 @@
   }
   .seg button.active{background:var(--red); color:#fff}
   #typeSeg button{font-size:12.5px; padding:9px 0}
+  #typeSegLearn button{font-size:12.5px; padding:9px 0}
+  .row-label{font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:1.5px; margin:12px 0 6px}
+  #rowSeg{flex-wrap:wrap}
+  #rowSeg button{flex:0 0 calc(20% - 4px); font-size:12px; padding:8px 0}
   main{flex:1; overflow-y:auto; padding:0 18px 14px; -webkit-overflow-scrolling:touch}
   /* ── flashcard ── */
   .card{
@@ -222,6 +226,20 @@
       <button data-t="dakuten">Dakuten</button>
       <button data-t="combo">Spojení</button>
     </div>
+    <div class="row-label">Oblast – řada znaků (třeba KA + SA = „od ka do so")</div>
+    <div class="seg" id="rowSeg" style="margin:0 0 12px">
+      <button data-t="all" class="active">Vše</button>
+      <button data-t="a">A</button>
+      <button data-t="ka">KA</button>
+      <button data-t="sa">SA</button>
+      <button data-t="ta">TA</button>
+      <button data-t="na">NA</button>
+      <button data-t="ha">HA</button>
+      <button data-t="ma">MA</button>
+      <button data-t="ya">YA</button>
+      <button data-t="ra">RA</button>
+      <button data-t="wa">WA</button>
+    </div>
     <div id="quizActive">
       <div class="q-score"><span>Otázka <b id="qNum">1</b>/10</span><span>Skóre: <b id="qScore">0</b></span></div>
       <div class="q-prompt">
@@ -229,6 +247,11 @@
         <div id="qDisplay" class="q-kana">あ</div>
       </div>
       <div class="opts" id="qOpts"></div>
+    </div>
+    <div id="quizEmpty" class="result hidden">
+      <div class="grade">🤔</div>
+      <h2>Žádné znaky</h2>
+      <p>Pro tuto kombinaci nejsou žádné znaky – zapni jinou oblast nebo skupinu.</p>
     </div>
     <div id="quizResult" class="result hidden">
       <div class="grade" id="rGrade">🎉</div>
@@ -286,6 +309,21 @@ const BASIC_ROMA = ['a/i/u/e/o','ka/ki/ku/ke/ko','sa/shi,si/su/se/so',
                     'ta/chi,ti/tsu,tu/te/to','na/ni/nu/ne/no','ha/hi/fu,hu/he/ho',
                     'ma/mi/mu/me/mo','ya/yu/yo','ra/ri/ru/re/ro','wa/wo,o/n'];
 
+// řady (oblasti) – ke které řadě tabulky znak patří
+const ROW_KEYS = ['a','ka','sa','ta','na','ha','ma','ya','ra','wa'];
+const ALL_TYPES = ['basic', 'dakuten', 'combo'];
+const ROW_OF_HIRA = {};
+BASIC_KANA.forEach((row, i) => [...row].forEach(ch => ROW_OF_HIRA[ch] = ROW_KEYS[i]));
+// řada pro znak – u tečkovaných (じ, ぎ…) se vrátí na základní znak řady
+function rowOfChar(ch){
+  if(ROW_OF_HIRA[ch]) return ROW_OF_HIRA[ch];
+  for(let off = 1; off <= 2; off++){
+    const base = String.fromCharCode(ch.charCodeAt(0) - off);
+    if(ROW_OF_HIRA[base]) return ROW_OF_HIRA[base];
+  }
+  return 'a';
+}
+
 // dakuten/handakuten se generují posunem kódu znaku (+1 = g/z/d/b, +2 = p)
 const DAK = [
   ['かきくけこ','ga/gi/gu/ge/go',1],
@@ -333,7 +371,7 @@ function buildScript(script){
   BASIC_KANA.forEach((row, i) => {
     const chars = [...row];
     const romas = romaList(BASIC_ROMA[i]);
-    chars.forEach((ch, j) => out.push({ k: t(ch), r: romas[j], s: script, ty: 'basic' }));
+    chars.forEach((ch, j) => out.push({ k: t(ch), r: romas[j], s: script, ty: 'basic', row: ROW_KEYS[i] }));
   });
 
   DAK.forEach(([base, roma, off]) => {
@@ -341,14 +379,14 @@ function buildScript(script){
     const romas = romaList(roma);
     chars.forEach((ch, j) => {
       const shifted = String.fromCharCode(ch.charCodeAt(0) + off);
-      out.push({ k: t(shifted), r: romas[j], s: script, ty: 'dakuten' });
+      out.push({ k: t(shifted), r: romas[j], s: script, ty: 'dakuten', row: rowOfChar(base[0]) });
     });
   });
 
   COMBO_PAIRS.forEach(([pair, roma]) => {
     const k = t(pair[0]) + t(pair[1]);
     // stejná struktura jako u základních znaků: pole alternativ, první = hlavní
-    out.push({ k, r: roma.split(',').map(s => s.trim()), s: script, ty: 'combo' });
+    out.push({ k, r: roma.split(',').map(s => s.trim()), s: script, ty: 'combo', row: rowOfChar(pair[0]) });
   });
   return out;
 }
@@ -610,15 +648,25 @@ function answerCard(ok){
 
 /* ═══════════════ TEST ═══════════════ */
 let qIndex = 0, qScore = 0, qCorrect = null, qDir = 'k2r', locked = false;
-let quizTypes = new Set(['basic', 'dakuten', 'combo']); // které skupiny se testují
+let quizTypes = new Set(ALL_TYPES);   // které skupiny se testují
+let quizRows  = new Set(ROW_KEYS);    // které řady (oblasti) se testují
 
 function getQuizPool(){
-  const p = POOL[script].filter(e => quizTypes.has(e.ty));
-  return p.length ? p : POOL[script];
+  const allRows = quizRows.size === ROW_KEYS.length;
+  const p = POOL[script].filter(e => quizTypes.has(e.ty) && (allRows || quizRows.has(e.row)));
+  return p;
 }
 
 function startQuiz(){
   qIndex = 0; qScore = 0; locked = false;
+  // kombinace skupin + oblastí může dát prázdný výběr (např. YA + Dakuten)
+  if(!getQuizPool().length){
+    $('quizActive').classList.add('hidden');
+    $('quizResult').classList.add('hidden');
+    $('quizEmpty').classList.remove('hidden');
+    return;
+  }
+  $('quizEmpty').classList.add('hidden');
   $('quizActive').classList.remove('hidden');
   $('quizResult').classList.add('hidden');
   nextQuestion();
@@ -731,22 +779,21 @@ $('btnReset').addEventListener('click', () => {
   }
 });
 
-// ── společné přepínače skupin (Vše / Základní / Dakuten / Spojení) ──
-function toggleTypes(set, t){
-  const ALL = ['basic', 'dakuten', 'combo'];
-  if(t === 'all') return new Set(ALL);
+// ── společné přepínače (skupiny i řady): zobecněné pro libovolný počet ──
+function toggleTypes(set, t, all = ALL_TYPES){
+  if(t === 'all') return new Set(all);
   const s = new Set(set);
-  if(s.size === 3) return new Set([t]);      // z "Vše" → izoluj vybranou skupinu
+  if(s.size === all.length) return new Set([t]);  // z "Vše" → izoluj vybrané
   if(s.has(t)){
     s.delete(t);
-    if(!s.size) return new Set(ALL);          // poslední vypnuté → zpět na Vše
+    if(!s.size) return new Set(all);              // poslední vypnuté → zpět na Vše
     return s;
   }
   s.add(t);
   return s;
 }
-function syncTypeSeg(segId, set){
-  const allOn = set.size === 3;
+function syncTypeSeg(segId, set, all = ALL_TYPES){
+  const allOn = set.size === all.length;
   $(segId).querySelectorAll('button').forEach(x => {
     const active = x.dataset.t === 'all' ? allOn : set.has(x.dataset.t);
     x.classList.toggle('active', active);
@@ -761,6 +808,13 @@ function wireTypeSeg(segId, onChange){
 wireTypeSeg('typeSeg', t => {
   quizTypes = toggleTypes(quizTypes, t);
   syncTypeSeg('typeSeg', quizTypes);
+  if(!$('view-quiz').classList.contains('hidden')) startQuiz();
+});
+
+// výběr oblasti (řady) v testu
+wireTypeSeg('rowSeg', t => {
+  quizRows = toggleTypes(quizRows, t, ROW_KEYS);
+  syncTypeSeg('rowSeg', quizRows, ROW_KEYS);
   if(!$('view-quiz').classList.contains('hidden')) startQuiz();
 });
 
