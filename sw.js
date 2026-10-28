@@ -1,5 +1,5 @@
 /* Kana PWA – offline cache */
-const CACHE = 'kana-v1';
+const CACHE = 'kana-v2';
 const ASSETS = ['./', './index.html', './manifest.webmanifest',
                 './icon-192.png', './icon-512.png', './icon-180.png'];
 
@@ -17,10 +17,13 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   e.respondWith(
-    caches.match(e.request).then(hit => hit || fetch(e.request).then(resp => {
-      const copy = resp.clone();
-      caches.open(CACHE).then(c => c.put(e.request, copy));
-      return resp;
-    }).catch(() => caches.match('./index.html')))
+    // jen z aktuální cache – staré verze se po update smažou
+    caches.open(CACHE).then(c => c.match(e.request)).then(hit =>
+      hit || fetch(e.request).then(resp => {
+        const copy = resp.clone();
+        caches.open(CACHE).then(c => c.put(e.request, copy));
+        return resp;
+      }).catch(() => caches.open(CACHE).then(c => c.match('./index.html')))
+    )
   );
 });
