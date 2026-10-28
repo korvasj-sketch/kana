@@ -196,6 +196,12 @@
 
   <!-- ══════ UČENÍ ══════ -->
   <section id="view-learn">
+    <div class="seg" id="typeSegLearn" style="margin:0 0 12px">
+      <button data-t="all" class="active">Vše</button>
+      <button data-t="basic">Základní</button>
+      <button data-t="dakuten">Dakuten</button>
+      <button data-t="combo">Spojení</button>
+    </div>
     <div class="card" id="card">
       <div class="speak">🔊</div>
       <div class="kana" id="cardKana">あ</div>
@@ -535,9 +541,10 @@ function renderOverview(){
 
 /* ═══════════════ UČENÍ ═══════════════ */
 let learnQueue = [], learnCurrent = null, learnFlipped = false;
+let learnTypes = new Set(['basic', 'dakuten', 'combo']); // které skupiny se učí
 
 function refillQueue(){
-  const pool = [...POOL[script]];
+  const pool = POOL[script].filter(e => learnTypes.has(e.ty));
   // nejdřív to, co neumím; náhodné pořadí
   pool.sort((a,b) => {
     const ma = entryState(a.k).mastered ? 1 : 0;
@@ -763,6 +770,14 @@ wireTypeSeg('typeSegStudy', t => {
   syncTypeSeg('typeSegStudy', studyTypes);
   studyIdx = 0;
   if(!$('view-study').classList.contains('hidden')) renderStudy();
+});
+
+// výběr skupin v učení (kartičky)
+wireTypeSeg('typeSegLearn', t => {
+  learnTypes = toggleTypes(learnTypes, t);
+  syncTypeSeg('typeSegLearn', learnTypes);
+  const d = $('learnDone'); if(d) d.remove();
+  refillQueue(); nextCard();
 });
 
 // šipky na klávesnici – listování znaky ve záložce Znaky
