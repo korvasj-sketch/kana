@@ -241,7 +241,7 @@
       <button data-t="wa">WA</button>
     </div>
     <div id="quizActive">
-      <div class="q-score"><span>Otázka <b id="qNum">1</b>/10</span><span>Skóre: <b id="qScore">0</b></span></div>
+      <div class="q-score"><span>Otázka <b id="qNum">1</b>/<span id="qLen">30</span></span><span>Skóre: <b id="qScore">0</b></span></div>
       <div class="q-prompt">
         <div class="q-label" id="qLabel">Čti tento znak</div>
         <div id="qDisplay" class="q-kana">あ</div>
@@ -648,6 +648,7 @@ function answerCard(ok){
 
 /* ═══════════════ TEST ═══════════════ */
 let qIndex = 0, qScore = 0, qCorrect = null, qDir = 'k2r', locked = false;
+const QUIZ_LEN = 30; // počet otázek v testu
 let quizTypes = new Set(ALL_TYPES);   // které skupiny se testují
 let quizRows  = new Set(ROW_KEYS);    // které řady (oblasti) se testují
 
@@ -659,6 +660,7 @@ function getQuizPool(){
 
 function startQuiz(){
   qIndex = 0; qScore = 0; locked = false;
+  $('qLen').textContent = QUIZ_LEN;
   // kombinace skupin + oblastí může dát prázdný výběr (např. YA + Dakuten)
   if(!getQuizPool().length){
     $('quizActive').classList.add('hidden');
@@ -674,7 +676,7 @@ function startQuiz(){
 function shuffle(a){ return a.sort(()=>Math.random()-.5); }
 
 function nextQuestion(){
-  if(qIndex >= 10){ showResult(); return; }
+  if(qIndex >= QUIZ_LEN){ showResult(); return; }
   locked = false;
   $('qNum').textContent = qIndex + 1;
   $('qScore').textContent = qScore;
@@ -731,12 +733,13 @@ function answer(btn, chosen){
 function showResult(){
   $('quizActive').classList.add('hidden');
   $('quizResult').classList.remove('hidden');
-  const grade = qScore === 10 ? '🏆' : qScore >= 8 ? '🎉' : qScore >= 5 ? '🙂' : '💪';
-  const title = qScore === 10 ? 'Perfektní!' : qScore >= 8 ? 'Výborně!' :
-                qScore >= 5 ? 'Dobrý základ' : 'Cvič, cvič – půjde to!';
+  const pct = qScore / QUIZ_LEN;
+  const grade = pct === 1 ? '🏆' : pct >= .8 ? '🎉' : pct >= .5 ? '🙂' : '💪';
+  const title = pct === 1 ? 'Perfektní!' : pct >= .8 ? 'Výborně!' :
+                pct >= .5 ? 'Dobrý základ' : 'Cvič, cvič – půjde to!';
   $('rGrade').textContent = grade;
   $('rTitle').textContent = title;
-  $('rText').textContent = qScore + '/10 správně';
+  $('rText').textContent = qScore + '/' + QUIZ_LEN + ' správně';
 }
 
 /* ═══════════════ OVLÁDÁNÍ ═══════════════ */
