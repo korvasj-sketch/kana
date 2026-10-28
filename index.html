@@ -234,6 +234,12 @@
 
   <!-- ══════ ZNAKY (vzdělávací) ══════ -->
   <section id="view-study" class="hidden">
+    <div class="seg" id="typeSegStudy" style="margin:0 0 12px">
+      <button data-t="all" class="active">Vše</button>
+      <button data-t="basic">Základní</button>
+      <button data-t="dakuten">Dakuten</button>
+      <button data-t="combo">Spojení</button>
+    </div>
     <div class="legend">
       <span style="margin-left:auto">klepnutím → výslovnost 🔊</span>
     </div>
@@ -386,6 +392,7 @@ function updateProgress(){
 /* ═══════════════ ZNAKY (studijní pohled) ═══════════════ */
 const TY_NAMES = { basic: 'Základní znaky', dakuten: 'Dakuten', combo: 'Spojení' };
 let studyList = [], studyIdx = 0;
+let studyTypes = new Set(['basic', 'dakuten', 'combo']); // které skupiny se zobrazují
 
 function studyShow(i){
   if(!studyList.length) return;
@@ -435,8 +442,13 @@ function renderStudy(){
     '</div>';
 
   scripts.forEach(([title, items]) => {
+    // sekci zobraz, jen pokud má alespoň jednu vybranou skupinu
+    const anyVisible = TY.some(([ty]) =>
+      studyTypes.has(ty) && items.some(e => e.ty === ty));
+    if(!anyVisible) return;
     html += `<div class="sec-title" style="font-size:16px;color:var(--text);letter-spacing:1px">${title}</div>`;
     TY.forEach(([ty, tyTitle]) => {
+      if(!studyTypes.has(ty)) return;
       const group = items.filter(e => e.ty === ty);
       if(!group.length) return;
       html += `<div class="sec-title">${tyTitle}</div><div class="grid">`;
@@ -712,29 +724,45 @@ $('btnReset').addEventListener('click', () => {
   }
 });
 
-// výběr skupin v testu (Vše / Základní / Dakuten / Spojení)
-$('typeSeg').querySelectorAll('button').forEach(b => {
-  b.addEventListener('click', () => {
-    const t = b.dataset.t;
-    const ALL = ['basic', 'dakuten', 'combo'];
-    if(t === 'all'){
-      quizTypes = new Set(ALL);
-    }else if(quizTypes.size === 3){
-      quizTypes = new Set([t]);            // z "Vše" → izoluj vybranou skupinu
-    }else if(quizTypes.has(t)){
-      quizTypes.delete(t);
-      if(!quizTypes.size) quizTypes = new Set(ALL);  // poslední vypnuté → zpět na Vše
-    }else{
-      quizTypes.add(t);
-    }
-    const allOn = quizTypes.size === 3;
-    $('typeSeg').querySelectorAll('button').forEach(x => {
-      const active = x.dataset.t === 'all' ? allOn : quizTypes.has(x.dataset.t);
-      x.classList.toggle('active', active);
-    });
-    // restart testu s novým filtrem (jen pokud jsme právě v testu)
-    if(!$('view-quiz').classList.contains('hidden')) startQuiz();
+// ── společné přepínače skupin (Vše / Základní / Dakuten / Spojení) ──
+function toggleTypes(set, t){
+  const ALL = ['basic', 'dakuten', 'combo'];
+  if(t === 'all') return new Set(ALL);
+  const s = new Set(set);
+  if(s.size === 3) return new Set([t]);      // z "Vše" → izoluj vybranou skupinu
+  if(s.has(t)){
+    s.delete(t);
+    if(!s.size) return new Set(ALL);          // poslední vypnuté → zpět na Vše
+    return s;
+  }
+  s.add(t);
+  return s;
+}
+function syncTypeSeg(segId, set){
+  const allOn = set.size === 3;
+  $(segId).querySelectorAll('button').forEach(x => {
+    const active = x.dataset.t === 'all' ? allOn : set.has(x.dataset.t);
+    x.classList.toggle('active', active);
   });
+}
+function wireTypeSeg(segId, onChange){
+  $(segId).querySelectorAll('button').forEach(b =>
+    b.addEventListener('click', () => onChange(b.dataset.t)));
+}
+
+// výběr skupin v testu
+wireTypeSeg('typeSeg', t => {
+  quizTypes = toggleTypes(quizTypes, t);
+  syncTypeSeg('typeSeg', quizTypes);
+  if(!$('view-quiz').classList.contains('hidden')) startQuiz();
+});
+
+// výběr skupin ve záložce Znaky
+wireTypeSeg('typeSegStudy', t => {
+  studyTypes = toggleTypes(studyTypes, t);
+  syncTypeSeg('typeSegStudy', studyTypes);
+  studyIdx = 0;
+  if(!$('view-study').classList.contains('hidden')) renderStudy();
 });
 
 // šipky na klávesnici – listování znaky ve záložce Znaky
