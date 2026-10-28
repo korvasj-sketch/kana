@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#14141c">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<title>Kana – uč se japonštinu</title>
+<style>
+  :root{
+    --bg:#14141c; --card:#1e1e2a; --card2:#262634; --text:#f2f2f7;
+    --dim:#8e8e9c; --red:#FF4E45; --green:#3ddc84; --orange:#ffb340;
+    --radius:18px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    display:flex; flex-direction:column; overflow:hidden;
+    padding-top:env(safe-area-inset-top);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  header{
+    padding:14px 18px 10px; display:flex; align-items:center; justify-content:space-between;
+  }
+  header h1{font-size:20px; font-weight:700; letter-spacing:.5px}
+  header h1 span{color:var(--red)}
+  #progressWrap{width:110px; height:8px; background:var(--card2); border-radius:4px; overflow:hidden}
+  #progressBar{height:100%; width:0%; background:linear-gradient(90deg,var(--red),#ff8a84); border-radius:4px; transition:width .3s}
+  #progressText{font-size:11px; color:var(--dim); margin-top:3px; text-align:right}
+  .seg{
+    display:flex; margin:0 18px 12px; background:var(--card); border-radius:12px; padding:4px; gap:4px;
+  }
+  .seg button{
+    flex:1; border:0; background:transparent; color:var(--dim); font-size:14px; font-weight:600;
+    padding:9px 0; border-radius:9px; cursor:pointer; transition:.15s;
+  }
+  .seg button.active{background:var(--red); color:#fff}
+  main{flex:1; overflow-y:auto; padding:0 18px 14px; -webkit-overflow-scrolling:touch}
+  /* ── flashcard ── */
+  .card{
+    background:var(--card); border-radius:var(--radius); min-height:300px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    cursor:pointer; position:relative; user-select:none; margin-bottom:14px;
+    border:1px solid #2c2c3c;
+  }
+  .card .kana{font-size:110px; line-height:1.1; font-weight:400}
+  .card .romaji{font-size:34px; color:var(--red); font-weight:700; margin-top:6px; letter-spacing:2px}
+  .card .hint{position:absolute; bottom:14px; font-size:12px; color:var(--dim)}
+  .card.flipped .kana{font-size:78px}
+  .card .speak{position:absolute; top:14px; right:16px; font-size:22px; opacity:.75}
+  .rowbtns{display:flex; gap:10px; margin-bottom:16px}
+  .rowbtns button{
+    flex:1; border:0; border-radius:14px; padding:16px 0; font-size:16px; font-weight:700;
+    cursor:pointer; transition:.15s;
+  }
+  .btn-no{background:var(--card2); color:var(--text)}
+  .btn-yes{background:var(--green); color:#08301c}
+  .btn-no:active,.btn-yes:active{transform:scale(.97)}
+  .done-box{
+    background:var(--card); border-radius:var(--radius); padding:40px 20px; text-align:center;
+  }
+  .done-box .big{font-size:46px; margin-bottom:10px}
+  .done-box p{color:var(--dim); margin-bottom:16px; line-height:1.5}
+  .done-box button{
+    background:var(--red); color:#fff; border:0; border-radius:12px;
+    padding:13px 26px; font-size:15px; font-weight:700; cursor:pointer;
+  }
+  /* ── quiz ── */
+  .q-prompt{
+    background:var(--card); border-radius:var(--radius); text-align:center;
+    padding:34px 10px; margin-bottom:14px; border:1px solid #2c2c3c;
+  }
+  .q-prompt .q-kana{font-size:86px; line-height:1.15}
+  .q-prompt .q-romaji{font-size:44px; font-weight:700; color:var(--red); letter-spacing:3px}
+  .q-prompt .q-label{font-size:12px; color:var(--dim); margin-bottom:6px; text-transform:uppercase; letter-spacing:1.5px}
+  .opts{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px}
+  .opts button{
+    background:var(--card2); border:2px solid transparent; color:var(--text);
+    border-radius:14px; padding:20px 8px; font-size:26px; font-weight:600;
+    cursor:pointer; transition:.12s; font-family:inherit;
+  }
+  .opts button.rom{font-size:22px; letter-spacing:1px}
+  .opts button:active{transform:scale(.97)}
+  .opts button.correct{background:rgba(61,220,132,.18); border-color:var(--green); color:var(--green)}
+  .opts button.wrong{background:rgba(255,78,69,.15); border-color:var(--red); color:var(--red)}
+  .q-score{display:flex; justify-content:space-between; font-size:14px; color:var(--dim); margin-bottom:8px}
+  .q-score b{color:var(--text)}
+  .result{ text-align:center; padding-top:40px }
+  .result .grade{font-size:84px; margin-bottom:6px}
+  .result h2{font-size:26px; margin-bottom:8px}
+  .result p{color:var(--dim); margin-bottom:22px}
+  .result button{
+    background:var(--red); color:#fff; border:0; border-radius:14px;
+    padding:15px 34px; font-size:16px; font-weight:700; cursor:pointer;
+  }
+  /* ── overview ── */
+  .sec-title{font-size:13px; color:var(--dim); text-transform:uppercase; letter-spacing:1.5px; margin:14px 4px 8px}
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(58px,1fr)); gap:8px; margin-bottom:6px}
+  .tile{
+    aspect-ratio:1; background:var(--card); border-radius:12px; display:flex;
+    flex-direction:column; align-items:center; justify-content:center; cursor:pointer;
+    border:1px solid #2c2c3c; position:relative; transition:.12s;
+  }
+  .tile:active{transform:scale(.94)}
+  .tile .g{font-size:27px}
+  .tile .r{font-size:10px; color:var(--dim); margin-top:1px}
+  .tile.mastered{background:rgba(61,220,132,.14); border-color:rgba(61,220,132,.5)}
+  .tile.mastered .r{color:var(--green)}
+  .tile.seen{background:rgba(255,179,64,.12); border-color:rgba(255,179,64,.45)}
+  .tile.seen .r{color:var(--orange)}
+  /* studijní pohled – čtení viditelné vždy */
+  .tile.study{min-height:70px; cursor:pointer}
+  .tile.study .g{font-size:25px}
+  .tile.study .r{font-size:12px; color:#c7c7d4; margin-top:4px; font-weight:600}
+  .tile.study:active{transform:scale(.94)}
+  .legend{display:flex; gap:14px; font-size:12px; color:var(--dim); margin:10px 4px 4px; flex-wrap:wrap}
+  .legend i{width:10px; height:10px; border-radius:3px; display:inline-block; margin-right:5px}
+  .reset{
+    display:block; margin:18px auto 8px; background:transparent; color:var(--red);
+    border:1px solid var(--red); border-radius:12px; padding:10px 22px;
+    font-size:14px; font-weight:600; cursor:pointer;
+  }
+  /* ── nav ── */
+  nav{
+    display:flex; background:#101018; border-top:1px solid #262634;
+    padding:8px 0 max(8px,env(safe-area-inset-bottom));
+  }
+  nav button{
+    flex:1; background:transparent; border:0; color:var(--dim); cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; gap:3px;
+    font-size:11px; font-weight:600; padding:4px 0; font-family:inherit;
+  }
+  nav button .ic{font-size:22px; filter:grayscale(1); opacity:.7}
+  nav button.active{color:var(--red)}
+  nav button.active .ic{filter:none; opacity:1}
+  .toast{
+    position:fixed; left:50%; bottom:96px; transform:translateX(-50%) translateY(20px);
+    background:#2c2c3c; color:#fff; padding:11px 20px; border-radius:30px;
+    font-size:14px; opacity:0; pointer-events:none; transition:.25s; z-index:50;
+    white-space:nowrap;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Ka<span>na</span> ✍️</h1>
+  <div>
+    <div id="progressWrap"><div id="progressBar"></div></div>
+    <div id="progressText">0 %</div>
+  </div>
+</header>
+
+<div class="seg" id="scriptSeg">
+  <button data-s="h" class="active">Hiragana</button>
+  <button data-s="k">Katakana</button>
+  <button data-s="b">Obojí</button>
+</div>
+
+<main id="main">
+
+  <!-- ══════ UČENÍ ══════ -->
+  <section id="view-learn">
+    <div class="card" id="card">
+      <div class="speak">🔊</div>
+      <div class="kana" id="cardKana">あ</div>
+      <div class="romaji hidden" id="cardRomaji">a</div>
+      <div class="hint" id="cardHint">klepnutím otočíš kartu</div>
+    </div>
+    <div class="rowbtns" id="cardBtns">
+      <button class="btn-no" id="btnNo">Ještě ne</button>
+      <button class="btn-yes" id="btnYes">Umím! ✔</button>
+    </div>
+  </section>
+
+  <!-- ══════ TEST ══════ -->
+  <section id="view-quiz" class="hidden">
+    <div id="quizActive">
+      <div class="q-score"><span>Otázka <b id="qNum">1</b>/10</span><span>Skóre: <b id="qScore">0</b></span></div>
+      <div class="q-prompt">
+        <div class="q-label" id="qLabel">Čti tento znak</div>
+        <div id="qDisplay" class="q-kana">あ</div>
+      </div>
+      <div class="opts" id="qOpts"></div>
+    </div>
+    <div id="quizResult" class="result hidden">
+      <div class="grade" id="rGrade">🎉</div>
+      <h2 id="rTitle">Výborně!</h2>
+      <p id="rText">9/10 správně</p>
+      <button id="btnAgain">Hrát znovu</button>
+    </div>
+  </section>
+
+  <!-- ══════ ZNAKY (vzdělávací) ══════ -->
+  <section id="view-study" class="hidden">
+    <div class="legend">
+      <span style="margin-left:auto">klepnutím → výslovnost 🔊</span>
+    </div>
+    <div id="studyContent"></div>
+  </section>
+
+  <!-- ══════ PŘEHLED ══════ -->
+  <section id="view-overview" class="hidden">
+    <div class="legend">
+      <span><i style="background:var(--green)"></i>umím</span>
+      <span><i style="background:var(--orange)"></i>viděl/a</span>
+      <span><i style="background:#3a3a4a"></i>neznám</span>
+      <span style="margin-left:auto">klepnutím → výslovnost 🔊</span>
+    </div>
+    <div id="ovContent"></div>
+    <button class="reset" id="btnReset">Vymazat veškerý pokrok</button>
+  </section>
+
+</main>
+
+<nav>
+  <button data-v="learn" class="active"><span class="ic">📖</span>Učení</button>
+  <button data-v="study"><span class="ic">📚</span>Znaky</button>
+  <button data-v="quiz"><span class="ic">🎯</span>Test</button>
+  <button data-v="overview"><span class="ic">🗂</span>Přehled</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═══════════════ DATA ═══════════════ */
+const VOW = ['a','i','u','e','o'];
+
+// základní řady (hiragana) + čtení (Hepburn, s alternativami po čárce)
+const BASIC_KANA = ['あいうえお','かきくけこ','さしすせそ','たちつてと','なにぬねの',
+                    'はひふへほ','まみむめも','やゆよ','らりるれろ','わをん'];
+const BASIC_ROMA = ['a/i/u/e/o','ka/ki/ku/ke/ko','sa/shi,si/su/se/so',
+                    'ta/chi,ti/tsu,tu/te/to','na/ni/nu/ne/no','ha/hi/fu,hu/he/ho',
+                    'ma/mi/mu/me/mo','ya/yu/yo','ra/ri/ru/re/ro','wa/wo,o/n'];
+
+// dakuten/handakuten se generují posunem kódu znaku (+1 = g/z/d/b, +2 = p)
+const DAK = [
+  ['かきくけこ','ga/gi/gu/ge/go',1],
+  ['さしすせそ','za/ji,zi/zu/ze/zo',1],
+  ['たちつてと','da/di,ji/du,zu/de/do',1],
+  ['はひふへほ','ba/bi/bu/be/bo',1],
+  ['はひふへほ','pa/pi/pu/pe/po',2],
+];
+
+// spojení (きゃ apod.) – jednou pro hiraganu, katakana se dopočítá (+0x60)
+const COMBO_K = ['きゃ','きゅ','きょ','しゃ','しゅ','しょ','ちゃ','ちゅ','ちょ',
+                 'にゃ','にゅ','にょ','ひゃ','ひゅ','ひょ','みゃ','みゅ','みょ',
+                 'りゃ','りゅ','りょ','じゃ','じゅ','じょ','ぎゃ','ぎゅ','ぎょ',
+                 'びゃ','びゅ','びょ','ぴゃ','ぴゅ','ぴょ'];
+const COMBO_R = ['kya,kyu,kyo','sha,shya/shu,shyu/sho,shyo','cha,tya/chu,tyu/cho,tyo',
+                 'nya/nyu/nyo','hya/hyu/hyo','mya/myu/myo','rya/ryu/ryo',
+                 'ja,jya,zya/ju,jyu,zyu/jo,jyo,zyo','gya/gyu/gyo',
+                 'bya/byu/byo','pya/pyu/pyo'];
+// (COMBO_R je složené – rozbalí se níže přes COMBO_PAIRS)
+
+const COMBO_PAIRS = [
+  ['きゃ','kya'],['きゅ','kyu'],['きょ','kyo'],
+  ['しゃ','sha,shya'],['しゅ','shu,shyu'],['しょ','sho,shyo'],
+  ['ちゃ','cha,tya'],['ちゅ','chu,tyu'],['ちょ','cho,tyo'],
+  ['にゃ','nya'],['にゅ','nyu'],['にょ','nyo'],
+  ['ひゃ','hya'],['ひゅ','hyu'],['ひょ','hyo'],
+  ['みゃ','mya'],['みゅ','myu'],['みょ','myo'],
+  ['りゃ','rya'],['りゅ','ryu'],['りょ','ryo'],
+  ['じゃ','ja,jya,zya'],['じゅ','ju,jyu,zyu'],['じょ','jo,jyo,zyo'],
+  ['ぎゃ','gya'],['ぎゅ','gyu'],['ぎょ','gyo'],
+  ['びゃ','bya'],['びゅ','byu'],['びょ','byo'],
+  ['ぴゃ','pya'],['ぴゅ','pyu'],['ぴょ','pyo'],
+];
+
+function toKata(ch){
+  const c = ch.charCodeAt(0);
+  return (c >= 0x3041 && c <= 0x3096) ? String.fromCharCode(c + 0x60) : ch;
+}
+function romaList(s){ return s.split('/').map(t => t.split(',')); } // [['shi','si'],...]
+
+function buildScript(script){
+  const out = [];
+  const t = script === 'k' ? toKata : (x => x);
+
+  BASIC_KANA.forEach((row, i) => {
+    const chars = [...row];
+    const romas = romaList(BASIC_ROMA[i]);
+    chars.forEach((ch, j) => out.push({ k: t(ch), r: romas[j], s: script, ty: 'basic' }));
+  });
+
+  DAK.forEach(([base, roma, off]) => {
+    const chars = [...base];
+    const romas = romaList(roma);
+    chars.forEach((ch, j) => {
+      const shifted = String.fromCharCode(ch.charCodeAt(0) + off);
+      out.push({ k: t(shifted), r: romas[j], s: script, ty: 'dakuten' });
+    });
+  });
+
+  COMBO_PAIRS.forEach(([pair, roma]) => {
+    const k = t(pair[0]) + t(pair[1]);
+    out.push({ k, r: romaList(roma), s: script, ty: 'combo' });
+  });
+  return out;
+}
+
+const POOL = { h: buildScript('h'), k: buildScript('k') };
+POOL.b = [...POOL.h, ...POOL.k];
+
+/* ═══════════════ STAV ═══════════════ */
+const KEY = 'kanaStateV1';
+let state = {};
+try { state = JSON.parse(localStorage.getItem(KEY)) || {}; } catch(e) { state = {}; }
+function save(){ localStorage.setItem(KEY, JSON.stringify(state)); }
+function entryState(k){
+  if(!state[k]) state[k] = { seen:0, ok:0, mastered:false };
+  return state[k];
+}
+
+let script = 'h';
+const $ = id => document.getElementById(id);
+
+/* ═══════════════ ZVUK ═══════════════ */
+function speak(text){
+  try{
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'ja-JP'; u.rate = .85;
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+let toastTimer;
+function toast(msg){
+  const t = $('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 1600);
+}
+
+/* ═══════════════ POKROK ═══════════════ */
+function updateProgress(){
+  const pool = POOL[script];
+  const done = pool.filter(e => entryState(e.k).mastered).length;
+  const pct = Math.round(done / pool.length * 100);
+  $('progressBar').style.width = pct + '%';
+  $('progressText').textContent = done + '/' + pool.length + ' · ' + pct + ' %';
+}
+
+/* ═══════════════ ZNAKY (studijní pohled) ═══════════════ */
+function renderStudy(){
+  const hira = buildScript('h'), kata = buildScript('k');
+  const scripts = script === 'h' ? [['Hiragana', hira]]
+                : script === 'k' ? [['Katakana', kata]]
+                : [['Hiragana', hira], ['Katakana', kata]];
+
+  const TY = [['basic', 'Základní znaky (a, ka, sa, …)'],
+              ['dakuten', 'Dakuten – tečky a kroužky (ga, za, pa, …)'],
+              ['combo', 'Spojení (kya, sha, chuo, …)']];
+
+  let html = '';
+  scripts.forEach(([title, items]) => {
+    html += `<div class="sec-title" style="font-size:16px;color:var(--text);letter-spacing:1px">${title}</div>`;
+    TY.forEach(([ty, tyTitle]) => {
+      const group = items.filter(e => e.ty === ty);
+      if(!group.length) return;
+      html += `<div class="sec-title">${tyTitle}</div><div class="grid">`;
+      group.forEach(e => {
+        html += `<div class="tile study" data-k="${e.k}">` +
+                `<span class="g">${e.k}</span>` +
+                `<span class="r">${e.r[0][0]}</span></div>`;
+      });
+      html += '</div>';
+    });
+  });
+  $('studyContent').innerHTML = html;
+
+  const all = [...hira, ...kata];
+  $('studyContent').querySelectorAll('.tile').forEach(el => {
+    el.addEventListener('click', () => {
+      const k = el.dataset.k;
+      const e = all.find(x => x.k === k);
+      speak(k);
+      toast(k + '  =  ' + e.r[0].join(' / '));
+    });
+  });
+  updateProgress();
+}
+
+/* ═══════════════ PŘEHLED ═══════════════ */
+function renderOverview(){
+  const groups = [
+    ['Základní znaky (46)', POOL[script === 'b' ? 'h' : script].slice(0, 46)],
+  ];
+  // rozdělíme podle typu přímo z poolu
+  const hira = buildScript('h'), kata = buildScript('k');
+  const list = script === 'h' ? [['Hiragana', hira]]
+             : script === 'k' ? [['Katakana', kata]]
+             : [['Hiragana', hira], ['Katakana', kata]];
+
+  let html = '';
+  list.forEach(([title, items]) => {
+    html += `<div class="sec-title">${title} (${items.length})</div><div class="grid">`;
+    items.forEach(e => {
+      const st = state[e.k];
+      const cls = st && st.mastered ? 'mastered' : (st && st.seen ? 'seen' : '');
+      html += `<div class="tile ${cls}" data-k="${e.k}"><span class="g">${e.k}</span>` +
+              `<span class="r">${e.r[0][0]}</span></div>`;
+    });
+    html += '</div>';
+  });
+  $('ovContent').innerHTML = html;
+  $('ovContent').querySelectorAll('.tile').forEach(el => {
+    el.addEventListener('click', () => {
+      const k = el.dataset.k;
+      const e = [...hira, ...kata].find(x => x.k === k);
+      speak(k);
+      toast(k + '  =  ' + e.r[0].join(' / '));
+    });
+  });
+  updateProgress();
+}
+
+/* ═══════════════ UČENÍ ═══════════════ */
+let learnQueue = [], learnCurrent = null, learnFlipped = false;
+
+function refillQueue(){
+  const pool = [...POOL[script]];
+  // nejdřív to, co neumím; náhodné pořadí
+  pool.sort((a,b) => {
+    const ma = entryState(a.k).mastered ? 1 : 0;
+    const mb = entryState(b.k).mastered ? 1 : 0;
+    return ma - mb;
+  });
+  learnQueue = pool;
+}
+function nextCard(){
+  if(!learnQueue.length) refillQueue();
+  // přeskoč už zvládnuté (jsou na konci), dokud zbyde alespoň něco neovládaného
+  while(learnQueue.length > 1 && entryState(learnQueue[0].k).mastered) learnQueue.shift();
+  if(learnQueue.length <= 1 && entryState(learnQueue[0]?.k || '').mastered){
+    $('card').classList.add('hidden'); $('cardBtns').classList.add('hidden');
+    if(!$('learnDone')){
+      const div = document.createElement('div');
+      div.className = 'done-box'; div.id = 'learnDone';
+      div.innerHTML = '<div class="big">🎉</div><p>Zvládl/a jsi <b>všechny</b> znaky této skupiny!<br>Skvělá práce!</p>' +
+                      '<button id="btnShuffle">Projít znovu</button>';
+      $('view-learn').appendChild(div);
+      div.querySelector('#btnShuffle').addEventListener('click', () => {
+        div.remove(); refillQueue(); nextCard();
+      });
+    }
+    return;
+  }
+  const d = $('learnDone'); if(d) d.remove();
+  $('card').classList.remove('hidden'); $('cardBtns').classList.remove('hidden');
+
+  learnCurrent = learnQueue.shift();
+  learnFlipped = false;
+  $('cardKana').textContent = learnCurrent.k;
+  $('cardRomaji').textContent = learnCurrent.r[0].join(' / ');
+  $('cardRomaji').classList.add('hidden');
+  $('cardHint').textContent = 'klepnutím otočíš kartu';
+  $('card').classList.remove('flipped');
+}
+function flipCard(){
+  if(!learnCurrent) return;
+  learnFlipped = !learnFlipped;
+  const st = entryState(learnCurrent.k);
+  if(learnFlipped){
+    $('cardRomaji').classList.remove('hidden');
+    $('cardHint').textContent = 'znám to? → tlačítka dole';
+    $('card').classList.add('flipped');
+    if(st.seen === 0) speak(learnCurrent.k);
+  }else{
+    $('cardRomaji').classList.add('hidden');
+    $('cardHint').textContent = 'klepnutím otočíš kartu';
+    $('card').classList.remove('flipped');
+  }
+}
+function answerCard(ok){
+  if(!learnCurrent) return;
+  const st = entryState(learnCurrent.k);
+  st.seen++;
+  if(ok){ st.mastered = true; st.ok++; speak(learnCurrent.k); }
+  else { st.mastered = false; }
+  save();
+  updateProgress();
+  nextCard();
+}
+
+/* ═══════════════ TEST ═══════════════ */
+let qIndex = 0, qScore = 0, qCorrect = null, qDir = 'k2r', locked = false;
+
+function startQuiz(){
+  qIndex = 0; qScore = 0; locked = false;
+  $('quizActive').classList.remove('hidden');
+  $('quizResult').classList.add('hidden');
+  nextQuestion();
+}
+function shuffle(a){ return a.sort(()=>Math.random()-.5); }
+
+function nextQuestion(){
+  if(qIndex >= 10){ showResult(); return; }
+  locked = false;
+  $('qNum').textContent = qIndex + 1;
+  $('qScore').textContent = qScore;
+
+  const pool = POOL[script];
+  qCorrect = pool[Math.floor(Math.random() * pool.length)];
+  qDir = Math.random() < .5 ? 'k2r' : 'r2k';
+
+  const disp = $('qDisplay');
+  if(qDir === 'k2r'){
+    $('qLabel').textContent = 'Čti tento znak';
+    disp.className = 'q-kana'; disp.textContent = qCorrect.k;
+  }else{
+    $('qLabel').textContent = 'Který znak to je?';
+    disp.className = 'q-romaji'; disp.textContent = qCorrect.r[0][0];
+  }
+
+  // možnosti: správná + 3 náhodné odlišné
+  const others = shuffle(pool.filter(e => e !== qCorrect && e.r[0][0] !== qCorrect.r[0][0])).slice(0, 3);
+  const opts = shuffle([qCorrect, ...others]);
+
+  const box = $('qOpts'); box.innerHTML = '';
+  opts.forEach(e => {
+    const b = document.createElement('button');
+    if(qDir === 'k2r'){ b.textContent = e.r[0][0]; b.classList.add('rom'); }
+    else { b.textContent = e.k; }
+    b.addEventListener('click', () => answer(b, e));
+    box.appendChild(b);
+  });
+}
+function answer(btn, chosen){
+  if(locked) return;
+  locked = true;
+  const ok = chosen === qCorrect;
+  const buttons = $('qOpts').querySelectorAll('button');
+  buttons.forEach(b => b.disabled = true);
+
+  if(ok){
+    btn.classList.add('correct'); qScore++;
+    const st = entryState(qCorrect.k); st.seen++; st.ok++;
+    speak(qCorrect.k);
+  }else{
+    btn.classList.add('wrong');
+    buttons.forEach(b => {
+      if((qDir === 'k2r' ? b.textContent === qCorrect.r[0][0]
+                          : b.textContent === qCorrect.k)) b.classList.add('correct');
+    });
+    entryState(qCorrect.k).seen++;
+  }
+  save(); updateProgress();
+  $('qScore').textContent = qScore;
+  setTimeout(() => { qIndex++; nextQuestion(); }, 850);
+}
+function showResult(){
+  $('quizActive').classList.add('hidden');
+  $('quizResult').classList.remove('hidden');
+  const grade = qScore === 10 ? '🏆' : qScore >= 8 ? '🎉' : qScore >= 5 ? '🙂' : '💪';
+  const title = qScore === 10 ? 'Perfektní!' : qScore >= 8 ? 'Výborně!' :
+                qScore >= 5 ? 'Dobrý základ' : 'Cvič, cvič – půjde to!';
+  $('rGrade').textContent = grade;
+  $('rTitle').textContent = title;
+  $('rText').textContent = qScore + '/10 správně';
+}
+
+/* ═══════════════ OVLÁDÁNÍ ═══════════════ */
+// segment skriptu
+$('scriptSeg').querySelectorAll('button').forEach(b => {
+  b.addEventListener('click', () => {
+    $('scriptSeg').querySelectorAll('button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    script = b.dataset.s;
+    refillQueue(); nextCard(); updateProgress(); renderOverview(); renderStudy();
+  });
+});
+
+// navigace
+document.querySelectorAll('nav button').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('nav button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    ['learn','study','quiz','overview'].forEach(v =>
+      $('view-' + v).classList.toggle('hidden', v !== b.dataset.v));
+    if(b.dataset.v === 'overview') renderOverview();
+    if(b.dataset.v === 'study') renderStudy();
+    if(b.dataset.v === 'quiz') startQuiz();
+    if(b.dataset.v === 'learn') nextCard();
+  });
+});
+
+$('card').addEventListener('click', e => {
+  if(e.target.classList.contains('speak') && learnCurrent){ speak(learnCurrent.k); return; }
+  flipCard();
+});
+$('btnYes').addEventListener('click', () => answerCard(true));
+$('btnNo').addEventListener('click', () => answerCard(false));
+$('btnAgain').addEventListener('click', startQuiz);
+$('btnReset').addEventListener('click', () => {
+  if(confirm('Opravdu smazat veškerý pokrok?')){
+    state = {}; save(); updateProgress(); renderOverview(); refillQueue(); nextCard();
+    toast('Pokrok smazán');
+  }
+});
+
+// servírovaní jako aplikace (service worker pro offline)
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+
+/* start */
+refillQueue(); nextCard(); updateProgress();
+</script>
+</body>
+</html>
