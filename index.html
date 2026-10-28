@@ -119,6 +119,32 @@
   .tile.study .g{font-size:25px}
   .tile.study .r{font-size:12px; color:#c7c7d4; margin-top:4px; font-weight:600}
   .tile.study:active{transform:scale(.94)}
+  .tile.active{border-color:var(--red); box-shadow:0 0 0 1px var(--red)}
+  /* jednotlivý znak přes celou šířku */
+  .study-hero{
+    background:var(--card); border:1px solid #2c2c3c; border-radius:var(--radius);
+    text-align:center; padding:16px 14px 16px; margin-bottom:14px;
+    position:sticky; top:0; z-index:5; user-select:none; -webkit-user-select:none;
+  }
+  .study-hero .sh-group{
+    font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:1.5px;
+  }
+  .study-hero .sh-kana{
+    font-size:150px; line-height:1.12; margin:4px 0 0; cursor:pointer;
+    -webkit-touch-callout:none;
+  }
+  .study-hero .sh-kana.long{font-size:104px}
+  .study-hero .sh-romaji{
+    font-size:34px; font-weight:700; color:var(--red); letter-spacing:4px; margin-top:2px;
+  }
+  .study-hero .sh-counter{font-size:12px; color:var(--dim); margin-top:6px}
+  .sh-nav{display:flex; gap:8px; margin-top:12px}
+  .sh-nav button{
+    flex:1; background:var(--card2); border:0; color:var(--text);
+    border-radius:11px; padding:12px 0; font-size:16px; font-weight:700;
+    cursor:pointer; font-family:inherit; transition:.12s;
+  }
+  .sh-nav button:active{transform:scale(.97)}
   .legend{display:flex; gap:14px; font-size:12px; color:var(--dim); margin:10px 4px 4px; flex-wrap:wrap}
   .legend i{width:10px; height:10px; border-radius:3px; display:inline-block; margin-right:5px}
   .reset{
@@ -351,6 +377,32 @@ function updateProgress(){
 }
 
 /* ═══════════════ ZNAKY (studijní pohled) ═══════════════ */
+const TY_NAMES = { basic: 'Základní znaky', dakuten: 'Dakuten', combo: 'Spojení' };
+let studyList = [], studyIdx = 0;
+
+function studyShow(i){
+  if(!studyList.length) return;
+  studyIdx = ((i % studyList.length) + studyList.length) % studyList.length;
+  const e = studyList[studyIdx];
+  const hero = $('studyHero');
+  const kEl = hero.querySelector('.sh-kana');
+  kEl.textContent = e.k;
+  kEl.classList.toggle('long', e.k.length > 1);
+  hero.querySelector('.sh-romaji').textContent = e.r.join(' / ');
+  hero.querySelector('.sh-group').textContent =
+    (e.s === 'h' ? 'Hiragana' : 'Katakana') + ' · ' + TY_NAMES[e.ty];
+  hero.querySelector('.sh-counter').textContent =
+    (studyIdx + 1) + ' / ' + studyList.length;
+
+  document.querySelectorAll('#studyContent .tile.active')
+    .forEach(t => t.classList.remove('active'));
+  const tile = document.querySelector('#studyContent .tile[data-idx="' + studyIdx + '"]');
+  if(tile){
+    tile.classList.add('active');
+    tile.scrollIntoView({ block: 'nearest' });
+  }
+}
+
 function renderStudy(){
   const hira = buildScript('h'), kata = buildScript('k');
   const scripts = script === 'h' ? [['Hiragana', hira]]
@@ -361,7 +413,20 @@ function renderStudy(){
               ['dakuten', 'Dakuten – tečky a kroužky (ga, za, pa, …)'],
               ['combo', 'Spojení (kya, sha, chuo, …)']];
 
-  let html = '';
+  studyList = [];
+  let html =
+    '<div class="study-hero" id="studyHero">' +
+      '<div class="sh-group"></div>' +
+      '<div class="sh-kana"></div>' +
+      '<div class="sh-romaji"></div>' +
+      '<div class="sh-counter"></div>' +
+      '<div class="sh-nav">' +
+        '<button id="shPrev">◀ Zpět</button>' +
+        '<button id="shRand">🔀</button>' +
+        '<button id="shNext">Dále ▶</button>' +
+      '</div>' +
+    '</div>';
+
   scripts.forEach(([title, items]) => {
     html += `<div class="sec-title" style="font-size:16px;color:var(--text);letter-spacing:1px">${title}</div>`;
     TY.forEach(([ty, tyTitle]) => {
@@ -369,7 +434,9 @@ function renderStudy(){
       if(!group.length) return;
       html += `<div class="sec-title">${tyTitle}</div><div class="grid">`;
       group.forEach(e => {
-        html += `<div class="tile study" data-k="${e.k}">` +
+        const idx = studyList.length;
+        studyList.push(e);
+        html += `<div class="tile study" data-k="${e.k}" data-idx="${idx}">` +
                 `<span class="g">${e.k}</span>` +
                 `<span class="r">${e.r[0]}</span></div>`;
       });
@@ -378,15 +445,38 @@ function renderStudy(){
   });
   $('studyContent').innerHTML = html;
 
-  const all = [...hira, ...kata];
+  // klepnutí na dlaždici → velký znac nahoře + výslovnost
   $('studyContent').querySelectorAll('.tile').forEach(el => {
     el.addEventListener('click', () => {
-      const k = el.dataset.k;
-      const e = all.find(x => x.k === k);
-      speak(k);
-      toast(k + '  =  ' + e.r.join(' / '));
+      const idx = +el.dataset.idx;
+      studyShow(idx);
+      const e = studyList[idx];
+      speak(e.k);
+      toast(e.k + '  =  ' + e.r.join(' / '));
     });
   });
+
+  // navigace
+  $('shPrev').addEventListener('click', () => studyShow(studyIdx - 1));
+  $('shNext').addEventListener('click', () => studyShow(studyIdx + 1));
+  $('shRand').addEventListener('click', () =>
+    studyShow(Math.floor(Math.random() * studyList.length)));
+  $('studyHero').querySelector('.sh-kana').addEventListener('click', () =>
+    speak(studyList[studyIdx].k));
+
+  // swipe vlevo/vpravo na telefonu
+  const hero = $('studyHero');
+  let touchX = null;
+  hero.addEventListener('touchstart',
+    e => { touchX = e.touches[0].clientX; }, { passive: true });
+  hero.addEventListener('touchend', e => {
+    if(touchX === null) return;
+    const dx = e.changedTouches[0].clientX - touchX;
+    touchX = null;
+    if(Math.abs(dx) > 40) studyShow(studyIdx + (dx < 0 ? 1 : -1));
+  }, { passive: true });
+
+  studyShow(studyIdx);
   updateProgress();
 }
 
@@ -606,6 +696,13 @@ $('btnReset').addEventListener('click', () => {
     state = {}; save(); updateProgress(); renderOverview(); refillQueue(); nextCard();
     toast('Pokrok smazán');
   }
+});
+
+// šipky na klávesnici – listování znaky ve záložce Znaky
+document.addEventListener('keydown', e => {
+  if($('view-study').classList.contains('hidden')) return;
+  if(e.key === 'ArrowLeft') { studyShow(studyIdx - 1); e.preventDefault(); }
+  if(e.key === 'ArrowRight') { studyShow(studyIdx + 1); e.preventDefault(); }
 });
 
 // servírovaní jako aplikace (service worker pro offline)
