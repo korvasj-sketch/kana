@@ -302,7 +302,8 @@ function buildScript(script){
 
   COMBO_PAIRS.forEach(([pair, roma]) => {
     const k = t(pair[0]) + t(pair[1]);
-    out.push({ k, r: romaList(roma), s: script, ty: 'combo' });
+    // stejná struktura jako u základních znaků: pole alternativ, první = hlavní
+    out.push({ k, r: roma.split(',').map(s => s.trim()), s: script, ty: 'combo' });
   });
   return out;
 }
@@ -370,7 +371,7 @@ function renderStudy(){
       group.forEach(e => {
         html += `<div class="tile study" data-k="${e.k}">` +
                 `<span class="g">${e.k}</span>` +
-                `<span class="r">${e.r[0][0]}</span></div>`;
+                `<span class="r">${e.r[0]}</span></div>`;
       });
       html += '</div>';
     });
@@ -383,7 +384,7 @@ function renderStudy(){
       const k = el.dataset.k;
       const e = all.find(x => x.k === k);
       speak(k);
-      toast(k + '  =  ' + e.r[0].join(' / '));
+      toast(k + '  =  ' + e.r.join(' / '));
     });
   });
   updateProgress();
@@ -407,7 +408,7 @@ function renderOverview(){
       const st = state[e.k];
       const cls = st && st.mastered ? 'mastered' : (st && st.seen ? 'seen' : '');
       html += `<div class="tile ${cls}" data-k="${e.k}"><span class="g">${e.k}</span>` +
-              `<span class="r">${e.r[0][0]}</span></div>`;
+              `<span class="r">${e.r[0]}</span></div>`;
     });
     html += '</div>';
   });
@@ -417,7 +418,7 @@ function renderOverview(){
       const k = el.dataset.k;
       const e = [...hira, ...kata].find(x => x.k === k);
       speak(k);
-      toast(k + '  =  ' + e.r[0].join(' / '));
+      toast(k + '  =  ' + e.r.join(' / '));
     });
   });
   updateProgress();
@@ -460,7 +461,7 @@ function nextCard(){
   learnCurrent = learnQueue.shift();
   learnFlipped = false;
   $('cardKana').textContent = learnCurrent.k;
-  $('cardRomaji').textContent = learnCurrent.r[0].join(' / ');
+  $('cardRomaji').textContent = learnCurrent.r.join(' / ');
   $('cardRomaji').classList.add('hidden');
   $('cardHint').textContent = 'klepnutím otočíš kartu';
   $('card').classList.remove('flipped');
@@ -518,17 +519,17 @@ function nextQuestion(){
     disp.className = 'q-kana'; disp.textContent = qCorrect.k;
   }else{
     $('qLabel').textContent = 'Který znak to je?';
-    disp.className = 'q-romaji'; disp.textContent = qCorrect.r[0][0];
+    disp.className = 'q-romaji'; disp.textContent = qCorrect.r[0];
   }
 
   // možnosti: správná + 3 náhodné odlišné
-  const others = shuffle(pool.filter(e => e !== qCorrect && e.r[0][0] !== qCorrect.r[0][0])).slice(0, 3);
+  const others = shuffle(pool.filter(e => e !== qCorrect && e.r[0] !== qCorrect.r[0])).slice(0, 3);
   const opts = shuffle([qCorrect, ...others]);
 
   const box = $('qOpts'); box.innerHTML = '';
   opts.forEach(e => {
     const b = document.createElement('button');
-    if(qDir === 'k2r'){ b.textContent = e.r[0][0]; b.classList.add('rom'); }
+    if(qDir === 'k2r'){ b.textContent = e.r[0]; b.classList.add('rom'); }
     else { b.textContent = e.k; }
     b.addEventListener('click', () => answer(b, e));
     box.appendChild(b);
@@ -548,7 +549,7 @@ function answer(btn, chosen){
   }else{
     btn.classList.add('wrong');
     buttons.forEach(b => {
-      if((qDir === 'k2r' ? b.textContent === qCorrect.r[0][0]
+      if((qDir === 'k2r' ? b.textContent === qCorrect.r[0]
                           : b.textContent === qCorrect.k)) b.classList.add('correct');
     });
     entryState(qCorrect.k).seen++;
