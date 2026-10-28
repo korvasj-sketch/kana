@@ -41,6 +41,7 @@
     padding:9px 0; border-radius:9px; cursor:pointer; transition:.15s;
   }
   .seg button.active{background:var(--red); color:#fff}
+  #typeSeg button{font-size:12.5px; padding:9px 0}
   main{flex:1; overflow-y:auto; padding:0 18px 14px; -webkit-overflow-scrolling:touch}
   /* ── flashcard ── */
   .card{
@@ -209,6 +210,12 @@
 
   <!-- ══════ TEST ══════ -->
   <section id="view-quiz" class="hidden">
+    <div class="seg" id="typeSeg" style="margin:0 0 12px">
+      <button data-t="all" class="active">Vše</button>
+      <button data-t="basic">Základní</button>
+      <button data-t="dakuten">Dakuten</button>
+      <button data-t="combo">Spojení</button>
+    </div>
     <div id="quizActive">
       <div class="q-score"><span>Otázka <b id="qNum">1</b>/10</span><span>Skóre: <b id="qScore">0</b></span></div>
       <div class="q-prompt">
@@ -584,6 +591,12 @@ function answerCard(ok){
 
 /* ═══════════════ TEST ═══════════════ */
 let qIndex = 0, qScore = 0, qCorrect = null, qDir = 'k2r', locked = false;
+let quizTypes = new Set(['basic', 'dakuten', 'combo']); // které skupiny se testují
+
+function getQuizPool(){
+  const p = POOL[script].filter(e => quizTypes.has(e.ty));
+  return p.length ? p : POOL[script];
+}
 
 function startQuiz(){
   qIndex = 0; qScore = 0; locked = false;
@@ -599,7 +612,7 @@ function nextQuestion(){
   $('qNum').textContent = qIndex + 1;
   $('qScore').textContent = qScore;
 
-  const pool = POOL[script];
+  const pool = getQuizPool();
   qCorrect = pool[Math.floor(Math.random() * pool.length)];
   qDir = Math.random() < .5 ? 'k2r' : 'r2k';
 
@@ -667,6 +680,7 @@ $('scriptSeg').querySelectorAll('button').forEach(b => {
     b.classList.add('active');
     script = b.dataset.s;
     refillQueue(); nextCard(); updateProgress(); renderOverview(); renderStudy();
+    if(!$('view-quiz').classList.contains('hidden')) startQuiz();
   });
 });
 
@@ -696,6 +710,31 @@ $('btnReset').addEventListener('click', () => {
     state = {}; save(); updateProgress(); renderOverview(); refillQueue(); nextCard();
     toast('Pokrok smazán');
   }
+});
+
+// výběr skupin v testu (Vše / Základní / Dakuten / Spojení)
+$('typeSeg').querySelectorAll('button').forEach(b => {
+  b.addEventListener('click', () => {
+    const t = b.dataset.t;
+    const ALL = ['basic', 'dakuten', 'combo'];
+    if(t === 'all'){
+      quizTypes = new Set(ALL);
+    }else if(quizTypes.size === 3){
+      quizTypes = new Set([t]);            // z "Vše" → izoluj vybranou skupinu
+    }else if(quizTypes.has(t)){
+      quizTypes.delete(t);
+      if(!quizTypes.size) quizTypes = new Set(ALL);  // poslední vypnuté → zpět na Vše
+    }else{
+      quizTypes.add(t);
+    }
+    const allOn = quizTypes.size === 3;
+    $('typeSeg').querySelectorAll('button').forEach(x => {
+      const active = x.dataset.t === 'all' ? allOn : quizTypes.has(x.dataset.t);
+      x.classList.toggle('active', active);
+    });
+    // restart testu s novým filtrem (jen pokud jsme právě v testu)
+    if(!$('view-quiz').classList.contains('hidden')) startQuiz();
+  });
 });
 
 // šipky na klávesnici – listování znaky ve záložce Znaky
