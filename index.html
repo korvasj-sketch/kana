@@ -170,6 +170,25 @@
   nav button .ic{font-size:22px; filter:grayscale(1); opacity:.7}
   nav button.active{color:var(--red)}
   nav button.active .ic{filter:none; opacity:1}
+  /* ── věty ── */
+  .sent-info{font-size:11px; color:var(--dim); text-align:center; margin-bottom:10px; line-height:1.5}
+  .sent-card{
+    background:var(--card); border:1px solid #2c2c3c; border-radius:var(--radius);
+    text-align:center; padding:20px 16px; position:sticky; top:0; z-index:5;
+  }
+  .sent-type{font-size:11px; letter-spacing:2px; color:var(--dim); text-transform:uppercase}
+  .sent-kana{font-size:52px; line-height:1.3; margin:8px 0 4px; word-break:break-word}
+  .sent-kana.long{font-size:34px}
+  .sent-romaji{font-size:16px; color:#c7c7d4; letter-spacing:1.5px}
+  .sent-meaning{font-size:18px; font-weight:700; color:var(--red); margin-top:8px}
+  .sent-list{display:flex; flex-wrap:wrap; gap:6px; margin-top:14px}
+  .sent-chip{
+    background:var(--card2); border:0; color:var(--text); border-radius:9px;
+    padding:7px 11px; font-size:15px; cursor:pointer; font-family:inherit; transition:.12s;
+  }
+  .sent-chip:active{transform:scale(.95)}
+  .sent-chip.on{background:var(--red); color:#fff}
+  .sent-empty{text-align:center; color:var(--dim); padding:26px 12px; line-height:1.7}
   .toast{
     position:fixed; left:50%; bottom:96px; transform:translateX(-50%) translateY(20px);
     background:#2c2c3c; color:#fff; padding:11px 20px; border-radius:30px;
@@ -275,6 +294,22 @@
     <div id="studyContent"></div>
   </section>
 
+  <!-- ══════ VĚTY (slova a větičky z vybraných znaků) ══════ -->
+  <section id="view-sent" class="hidden">
+    <div class="sent-info" id="sentFilter"></div>
+    <div class="sent-card" id="sentCard">
+      <div class="sent-type" id="sentType">slovo</div>
+      <div class="sent-kana" id="sentKana">あい</div>
+      <div class="sent-romaji" id="sentRomaji">ai</div>
+      <div class="sent-meaning" id="sentMeaning">láska</div>
+    </div>
+    <div class="rowbtns">
+      <button class="btn-no" id="btnSpeakSent">🔊 Znít</button>
+      <button class="btn-yes" id="btnNextSent">Další ➡</button>
+    </div>
+    <div id="sentContent"></div>
+  </section>
+
   <!-- ══════ PŘEHLED ══════ -->
   <section id="view-overview" class="hidden">
     <div class="legend">
@@ -293,6 +328,7 @@
   <button data-v="learn" class="active"><span class="ic">📖</span>Učení</button>
   <button data-v="study"><span class="ic">📚</span>Znaky</button>
   <button data-v="quiz"><span class="ic">🎯</span>Test</button>
+  <button data-v="sent"><span class="ic">💬</span>Věty</button>
   <button data-v="overview"><span class="ic">🗂</span>Přehled</button>
 </nav>
 
@@ -742,6 +778,212 @@ function showResult(){
   $('rText').textContent = qScore + '/' + QUIZ_LEN + ' správně';
 }
 
+/* ═══════════════ VĚTY (slova a větičky z vybraných znaků) ═══════════════ */
+// slovník: k = japonsky (hiragana), r = čtení, c = česky, t = 'w' slovo / 's' věta
+// pravidla: jen běžné znaky (žádné っ, ー), spojení jen jako celé dvojice
+const SENT_ITEMS = [
+  // ── slova ──
+  {k:'あい', r:'ai', c:'láska', t:'w'},
+  {k:'あお', r:'ao', c:'modrá', t:'w'},
+  {k:'あめ', r:'ame', c:'déšť', t:'w'},
+  {k:'あし', r:'ashi', c:'noha', t:'w'},
+  {k:'あう', r:'au', c:'potkat se', t:'w'},
+  {k:'いい', r:'ii', c:'dobře', t:'w'},
+  {k:'いえ', r:'ie', c:'dům', t:'w'},
+  {k:'いぬ', r:'inu', c:'pes', t:'w'},
+  {k:'うえ', r:'ue', c:'nahoře', t:'w'},
+  {k:'うみ', r:'umi', c:'moře', t:'w'},
+  {k:'うた', r:'uta', c:'píseň', t:'w'},
+  {k:'えき', r:'eki', c:'nádraží', t:'w'},
+  {k:'えい', r:'ei', c:'film', t:'w'},
+  {k:'おと', r:'oto', c:'zvuk', t:'w'},
+  {k:'おかね', r:'okane', c:'peníze', t:'w'},
+  {k:'かさ', r:'kasa', c:'deštník', t:'w'},
+  {k:'かお', r:'kao', c:'obličej', t:'w'},
+  {k:'かく', r:'kaku', c:'psát', t:'w'},
+  {k:'かこ', r:'kako', c:'minulost', t:'w'},
+  {k:'き', r:'ki', c:'strom', t:'w'},
+  {k:'きく', r:'kiku', c:'poslouchat', t:'w'},
+  {k:'くつ', r:'kutsu', c:'boty', t:'w'},
+  {k:'くき', r:'kuki', c:'stonek', t:'w'},
+  {k:'くも', r:'kumo', c:'pavouk', t:'w'},
+  {k:'こけ', r:'koke', c:'mech', t:'w'},
+  {k:'さかな', r:'sakana', c:'ryba', t:'w'},
+  {k:'しお', r:'shio', c:'sůl', t:'w'},
+  {k:'すし', r:'sushi', c:'sushi', t:'w'},
+  {k:'さす', r:'sasu', c:'bodat', t:'w'},
+  {k:'たつ', r:'tatsu', c:'vstát', t:'w'},
+  {k:'たて', r:'tate', c:'štít', t:'w'},
+  {k:'たまご', r:'tamago', c:'vejce', t:'w'},
+  {k:'つき', r:'tsuki', c:'měsíc', t:'w'},
+  {k:'て', r:'te', c:'ruka', t:'w'},
+  {k:'とけい', r:'tokei', c:'hodinky', t:'w'},
+  {k:'なな', r:'nana', c:'sedm', t:'w'},
+  {k:'なに', r:'nani', c:'co', t:'w'},
+  {k:'にわ', r:'niwa', c:'zahrada', t:'w'},
+  {k:'ねこ', r:'neko', c:'kočka', t:'w'},
+  {k:'はな', r:'hana', c:'květina', t:'w'},
+  {k:'はし', r:'hashi', c:'hůlky', t:'w'},
+  {k:'はは', r:'haha', c:'matka', t:'w'},
+  {k:'ひ', r:'hi', c:'oheň', t:'w'},
+  {k:'ふね', r:'fune', c:'loď', t:'w'},
+  {k:'へび', r:'hebi', c:'had', t:'w'},
+  {k:'ほほ', r:'hoho', c:'líce', t:'w'},
+  {k:'ほん', r:'hon', c:'kniha', t:'w'},
+  {k:'まど', r:'mado', c:'okno', t:'w'},
+  {k:'まめ', r:'mame', c:'fazole', t:'w'},
+  {k:'まま', r:'mama', c:'máma', t:'w'},
+  {k:'みず', r:'mizu', c:'voda', t:'w'},
+  {k:'みち', r:'michi', c:'cesta', t:'w'},
+  {k:'みみ', r:'mimi', c:'ucho', t:'w'},
+  {k:'め', r:'me', c:'oko', t:'w'},
+  {k:'もり', r:'mori', c:'les', t:'w'},
+  {k:'やや', r:'yaya', c:'trochu', t:'w'},
+  {k:'やま', r:'yama', c:'hora', t:'w'},
+  {k:'ゆき', r:'yuki', c:'sníh', t:'w'},
+  {k:'わに', r:'wani', c:'krokodýl', t:'w'},
+  {k:'わん', r:'wan', c:'„haf" (štěkot)', t:'w'},
+  {k:'りす', r:'risu', c:'veverka', t:'w'},
+  {k:'さくら', r:'sakura', c:'sakura', t:'w'},
+  {k:'くるま', r:'kuruma', c:'auto', t:'w'},
+  {k:'にじ', r:'niji', c:'duha', t:'w'},
+  {k:'ほし', r:'hoshi', c:'hvezda', t:'w'},
+  {k:'そら', r:'sora', c:'nebe', t:'w'},
+  {k:'たべもの', r:'tabemono', c:'jídlo', t:'w'},
+  {k:'にく', r:'niku', c:'maso', t:'w'},
+  {k:'でんき', r:'denki', c:'elektřina', t:'w'},
+  {k:'でんわ', r:'denwa', c:'telefon', t:'w'},
+  {k:'ばなな', r:'banana', c:'banán', t:'w'},
+  {k:'ぱん', r:'pan', c:'chléb', t:'w'},
+  {k:'ぼく', r:'boku', c:'já', t:'w'},
+  {k:'がくせい', r:'gakusei', c:'student', t:'w'},
+  {k:'だれ', r:'dare', c:'kdo', t:'w'},
+  {k:'どこ', r:'doko', c:'kde', t:'w'},
+  {k:'どう', r:'dou', c:'jak', t:'w'},
+  {k:'ねずみ', r:'nezumi', c:'myš', t:'w'},
+  {k:'おおかみ', r:'ookami', c:'vlk', t:'w'},
+  {k:'じゃがいも', r:'jagaimo', c:'brambor', t:'w'},
+  {k:'きゃく', r:'kyaku', c:'host', t:'w'},
+  {k:'しゃしん', r:'shashin', c:'fotka', t:'w'},
+  {k:'ちゃわん', r:'chawan', c:'miska', t:'w'},
+  {k:'ひゃく', r:'hyaku', c:'sto', t:'w'},
+  {k:'じゅう', r:'juu', c:'deset', t:'w'},
+  {k:'ぎゅうにゅう', r:'gyuunyuu', c:'mléko', t:'w'},
+  {k:'しゅくだい', r:'shukudai', c:'domácí úkol', t:'w'},
+  {k:'きょう', r:'kyou', c:'Tokio', t:'w'},
+  {k:'びよういん', r:'biyouin', c:'nemocnice', t:'w'},
+  {k:'しゅみ', r:'shumi', c:'záliba', t:'w'},
+  // ── větičky ──
+  {k:'ほんをよむ', r:'hon o yomu', c:'číst knihu', t:'s'},
+  {k:'うたをうたう', r:'uta o utau', c:'zpívat píseň', t:'s'},
+  {k:'てをあらう', r:'te o arau', c:'umýt si ruce', t:'s'},
+  {k:'あさにおきます', r:'asa ni okimasu', c:'ráno vstanu', t:'s'},
+  {k:'ゆうにねる', r:'yuu ni neru', c:'jít spát', t:'s'},
+  {k:'いつにほんへいきますか', r:'itsu nihon e ikimasu ka', c:'kdy pojedeš do Japonska?', t:'s'},
+  {k:'とりはそらをとぶ', r:'tori wa sora o tobu', c:'pták létá po obloze', t:'s'},
+  {k:'ねこはここにいます', r:'neko wa koko ni imasu', c:'kočka je tady', t:'s'},
+  {k:'いぬはそとにいます', r:'inu wa soto ni imasu', c:'pes je venku', t:'s'},
+  {k:'あさははやい', r:'asa wa hayai', c:'ráno je brzké', t:'s'},
+  {k:'きょうはいいてんき', r:'kyou wa ii tenki', c:'dnes je hezké počasí', t:'s'},
+  {k:'きをつける', r:'ki o tsukeru', c:'dávat pozor', t:'s'},
+  {k:'そらをみる', r:'sora o miru', c:'dívat se na oblohu', t:'s'},
+  {k:'ねこがいます', r:'neko ga imasu', c:'je tady kočka', t:'s'},
+  {k:'これはほんです', r:'kore wa hon desu', c:'to je kniha', t:'s'},
+  {k:'みずをのむ', r:'mizu o nomu', c:'pít vodu', t:'s'},
+  {k:'さかなをたべる', r:'sakana o taberu', c:'jíst rybu', t:'s'},
+  {k:'ゆきがふる', r:'yuki ga furu', c:'padá sníh', t:'s'},
+  {k:'あめがふる', r:'ame ga furu', c:'prší', t:'s'},
+  {k:'なにがありますか', r:'nani ga arimasu ka', c:'co je tam?', t:'s'},
+  {k:'でんきがきえた', r:'denki ga kieta', c:'zhaslo světlo', t:'s'},
+  {k:'がくせいです', r:'gakusei desu', c:'jsem student', t:'s'},
+  {k:'にほんごをべんきょうする', r:'nihongo o benkyou suru', c:'učit se japonštinu', t:'s'},
+  {k:'きのしたでねる', r:'ki no shita de neru', c:'spát pod stromem', t:'s'},
+  {k:'なまえはなんですか', r:'namae wa nan desu ka', c:'jak se jmenuješ?', t:'s'},
+  {k:'くるまがとまる', r:'kuruma ga tomaru', c:'auto se zastaví', t:'s'},
+  {k:'はながさく', r:'hana ga sakuru', c:'květina rozkvétá', t:'s'},
+  {k:'ねずみがにげる', r:'nezumi ga nigeru', c:'myš utíká', t:'s'},
+  {k:'うみでおよく', r:'umi de oyoku', c:'plavat v moři', t:'s'},
+  {k:'ゆきがたくさん', r:'yuki ga takusan', c:'hodně sněhu', t:'s'},
+];
+
+// dostupné jednotky (znaky) podle filtru z Testu – jen hiragana, zobrazení se přepočte
+function sentUnits(){
+  const allRows = quizRows.size === ROW_KEYS.length;
+  return new Set(POOL.h
+    .filter(e => quizTypes.has(e.ty) && (allRows || quizRows.has(e.row)))
+    .map(e => e.k));
+}
+// sedí celý text do dostupných jednotek? (dvojice spojení beru jako celek)
+function sentFits(text, units){
+  let i = 0;
+  while(i < text.length){
+    const two = text.substr(i, 2);
+    if(two.length === 2 && units.has(two)){ i += 2; continue; }
+    if(units.has(text[i])){ i += 1; continue; }
+    return false;
+  }
+  return true;
+}
+function sentDisplay(k){ return script === 'k' ? [...k].map(toKata).join('') : k; }
+
+let sentCurrent = null, sentPool = [];
+
+function sentShow(){
+  const s = sentCurrent;
+  const disp = sentDisplay(s.k);
+  $('sentType').textContent = s.t === 'w' ? '🧩 slovo' : '💬 větička';
+  const kEl = $('sentKana');
+  kEl.textContent = disp;
+  kEl.classList.toggle('long', disp.length > 7);
+  $('sentRomaji').textContent = s.r;
+  $('sentMeaning').textContent = s.c;
+  document.querySelectorAll('#sentContent .sent-chip').forEach(ch =>
+    ch.classList.toggle('on', +ch.dataset.i === sentPool.indexOf(s)));
+}
+
+function renderSent(){
+  const units = sentUnits();
+  sentPool = SENT_ITEMS.filter(s => sentFits(s.k, units));
+
+  // shrnutí aktivního filtru
+  const scr = script === 'h' ? 'Hiragana' : script === 'k' ? 'Katakana' : 'Obojí';
+  const tys = quizTypes.size === 3 ? 'všechny skupiny'
+              : [...quizTypes].map(t => TY_NAMES[t]).join(', ');
+  const rws = quizRows.size === ROW_KEYS.length ? 'všechny řady'
+              : 'řady ' + [...quizRows].map(x => x.toUpperCase()).join(' ');
+  $('sentFilter').textContent = 'Podle výběru z Testu: ' + scr + ' · ' + tys + ' · ' + rws;
+
+  if(!sentPool.length){
+    sentCurrent = null;
+    $('sentCard').classList.add('hidden');
+    $('sentContent').innerHTML =
+      '<div class="sent-empty">🤔 Pro tento výběr nemám žádné slovo ani větičku.<br>' +
+      '<small>Zkus v Testu zapnout více skupin nebo oblastí.</small></div>';
+    return;
+  }
+  $('sentCard').classList.remove('hidden');
+
+  // náhodně jiné než aktuální
+  let pick = sentPool[Math.floor(Math.random() * sentPool.length)];
+  if(sentPool.length > 1) while(pick === sentCurrent) pick = sentPool[Math.floor(Math.random() * sentPool.length)];
+  sentCurrent = pick;
+
+  $('sentContent').innerHTML =
+    '<div class="sent-list">' +
+    sentPool.map((s, i) => `<button class="sent-chip" data-i="${i}">${sentDisplay(s.k)}</button>`) +
+    '</div>';
+  $('sentContent').querySelectorAll('.sent-chip').forEach(ch =>
+    ch.addEventListener('click', () => {
+      sentCurrent = sentPool[+ch.dataset.i];
+      sentShow();
+      speak(sentCurrent.k);
+    }));
+  sentShow();
+}
+
+$('btnNextSent').addEventListener('click', renderSent);
+$('btnSpeakSent').addEventListener('click', () => sentCurrent && speak(sentCurrent.k));
+
 /* ═══════════════ OVLÁDÁNÍ ═══════════════ */
 // segment skriptu
 $('scriptSeg').querySelectorAll('button').forEach(b => {
@@ -751,6 +993,7 @@ $('scriptSeg').querySelectorAll('button').forEach(b => {
     script = b.dataset.s;
     refillQueue(); nextCard(); updateProgress(); renderOverview(); renderStudy();
     if(!$('view-quiz').classList.contains('hidden')) startQuiz();
+    if(!$('view-sent').classList.contains('hidden')) renderSent();
   });
 });
 
@@ -759,11 +1002,12 @@ document.querySelectorAll('nav button').forEach(b => {
   b.addEventListener('click', () => {
     document.querySelectorAll('nav button').forEach(x => x.classList.remove('active'));
     b.classList.add('active');
-    ['learn','study','quiz','overview'].forEach(v =>
+    ['learn','study','quiz','sent','overview'].forEach(v =>
       $('view-' + v).classList.toggle('hidden', v !== b.dataset.v));
     if(b.dataset.v === 'overview') renderOverview();
     if(b.dataset.v === 'study') renderStudy();
     if(b.dataset.v === 'quiz') startQuiz();
+    if(b.dataset.v === 'sent') renderSent();
     if(b.dataset.v === 'learn') nextCard();
   });
 });
@@ -812,6 +1056,7 @@ wireTypeSeg('typeSeg', t => {
   quizTypes = toggleTypes(quizTypes, t);
   syncTypeSeg('typeSeg', quizTypes);
   if(!$('view-quiz').classList.contains('hidden')) startQuiz();
+  if(!$('view-sent').classList.contains('hidden')) renderSent();
 });
 
 // výběr oblasti (řady) v testu
@@ -819,6 +1064,7 @@ wireTypeSeg('rowSeg', t => {
   quizRows = toggleTypes(quizRows, t, ROW_KEYS);
   syncTypeSeg('rowSeg', quizRows, ROW_KEYS);
   if(!$('view-quiz').classList.contains('hidden')) startQuiz();
+  if(!$('view-sent').classList.contains('hidden')) renderSent();
 });
 
 // výběr skupin ve záložce Znaky
